@@ -14,7 +14,7 @@ function main() {
 
   let f = path.join(process.env.PWD, instructions)
   let info = shell.cat(f).toString()
-  info = parse(info, f)
+  info = parse(name, info, f)
   if(isRemote(info.dst)) {
     setupSSH(info.dst, (err, conn) => {
       if(err) throw err
@@ -210,7 +210,7 @@ function isRemote(p) {
  * dst: <destination path>
  * <list of commands>
  */
-function parse(data, f) {
+function parse(name, data, f) {
   let lines = data.split(/[\r\n]/g)
                 .map(l => l.trim())
                 .filter(l => l)
@@ -220,12 +220,12 @@ function parse(data, f) {
   if(!lines[1].startsWith("dst:")) throw "Second line must be 'dst:'"
 
   let src = lines[0].substring("src:".length).trim()
-  src = path.resolve(resolveTokens(src))
+  src = path.resolve(resolveTokens(src, name))
   let dst = lines[1].substring("dst:".length).trim()
-  dst = resolveTokens(dst, src)
+  dst = resolveTokens(dst, name, src)
   if(!isRemote(dst)) dst = path.resolve(dst)
   let cmds = lines.slice(2)
-              .map(l => resolveTokens(l, src, dst))
+              .map(l => resolveTokens(l, name, src, dst))
               .map(to_cmd_1)
 
   return { src, dst, cmds }
@@ -240,13 +240,16 @@ function parse(data, f) {
  * Resolve any tokens on the given line:
  *    {src} ==> source directory
  *    {dst} ==> destination directory
+ *    {deploy} ==> name of deployment
  *    {tmp} ==> temporary directory
  *    {pwd} ==> location of present working directory
  */
 let TMPDIR = shell.tempdir()
-function resolveTokens(line, src, dst) {
+function resolveTokens(line, name, src, dst) {
+  dst = dst ? dst.split(" -p ")[0] : dst
   line = line.replace(/\{src\}/g, src)
   line = line.replace(/\{dst\}/g, dst)
+  line = line.replace(/\{deploy\}/g, name)
   line = line.replace(/\{tmp\}/g, TMPDIR)
   line = line.replace(/\{pwd\}/g, process.env.PWD)
   return line
