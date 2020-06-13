@@ -36,7 +36,7 @@ dst: user@server:/home/user/dst-tst -p 22
 
 # create a new bare repository
 run "rm -rf {tmp}/myrepo.git || true" in {tmp}
-run "git clone --bare {pwd}/myrepo" in {tmp}
+run "git clone --bare {src}/myrepo" in {tmp}
 # step back so that we can do an initial push
 run "git update-ref HEAD HEAD^" in {tmp}/myrepo.git
 # copy the post-receive hook
@@ -45,10 +45,10 @@ run "chmod +x post-receive" in {tmp}/myrepo.git/hooks
 # DEPLOY!
 copydir {tmp}/myrepo.git {dst}/_REPOS/myrepo.git
 # link up local and remote repo
-run "git remote rm {deploy} || true" in {pwd}/myrepo
-run "git remote add {deploy} {dst}/_REPOS/myrepo.git" in {pwd}/myrepo
+run "git remote rm {deploy} || true" in {src}/myrepo
+run "git remote add {deploy} {dst}/_REPOS/myrepo.git" in {src}/myrepo
 # do the initial push
-run "git push -q {deploy}" in {pwd}/myrepo
+run "git push -q {deploy}" in {src}/myrepo
 
 tellme All Done!
 
