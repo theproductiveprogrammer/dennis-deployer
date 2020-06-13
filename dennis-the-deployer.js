@@ -199,9 +199,9 @@ function copy(cmd, cb) {
 
 function p(loc, cmd) {
   return '"' +
-    loc.replace(cmd.src,'')
-    .replace(cmd.dst,'')
-    .replace(/^[/]/,'')
+    loc.replace(cmd.src,'{src}')
+    .replace(cmd.dst,'{dst}')
+    .replace(TMPDIR, '{tmp}')
   + '"'
 }
 
