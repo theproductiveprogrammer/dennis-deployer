@@ -16,6 +16,10 @@ Deploy locally or to a server! Dennis can do it all!
 
 “Easy job boss!”
 
+“Tell me when you’re done Dennis”
+
+“I’ll keep you posted boss”
+
 “Create a bare repo Dennis!”
 
 “Heh heh! That’s a pretty funny thing to say boss!”
