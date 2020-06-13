@@ -20,12 +20,6 @@ Deploy locally or to a server! Dennis can do it all!
 
 “I’ll keep you posted boss”
 
-“Create a bare repo Dennis!”
-
-“Heh heh! That’s a pretty funny thing to say boss!”
-
-Dennis is smart enough to create a bare repo one step behind so a ‘push’ can trigger a deployment hook.
-
 “Run this command in this folder Dennis”
 
 “Ok boss but I can’t be held responsible if it blows up!”
@@ -57,7 +51,6 @@ run "git remote add {deploy} {dst}/_REPOS/myrepo.git" in {pwd}/myrepo
 run "git push -q {deploy}" in {pwd}/myrepo
 
 tellme All Done!
-
 ```
 
 ---
