@@ -243,11 +243,11 @@ function parse(data, f) {
  *    {tmp} ==> temporary directory
  *    {pwd} ==> location of present working directory
  */
+let TMPDIR = shell.tempdir()
 function resolveTokens(line, src, dst) {
-  let tmp = shell.tempdir()
   line = line.replace(/\{src\}/g, src)
   line = line.replace(/\{dst\}/g, dst)
-  line = line.replace(/\{tmp\}/g, tmp)
+  line = line.replace(/\{tmp\}/g, TMPDIR)
   line = line.replace(/\{pwd\}/g, process.env.PWD)
   return line
 }
