@@ -1,0 +1,16 @@
+{
+  "name": "dennis",
+  "version": "0.1.0",
+  "description": "Dennis The Deployer",
+  "main": "dennis-the-deployer.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theproductiveprogrammer/dennis-deployer.git"
+  },
+  "author": "charles.lobo@gmail.com",
+  "license": "ISC",
+  "dependencies": {
+    "shelljs": "^0.8.4",
+    "ssh2": "^0.8.9"
+  }
+}
