@@ -72,6 +72,7 @@ function doCmdNdx(cmds, ndx, cb) {
     tellme,
     copy,
     copydir,
+    run,
   }
 
   let word = cmd.word
@@ -84,6 +85,39 @@ function doCmdNdx(cmds, ndx, cb) {
 }
 
 function tellme(cmd, cb) { shell.echo(cmd.args); cb() }
+
+function run(cmd, cb) {
+  let ei = cmd.args.split(" in ")
+  if(ei.length != 2) throw `Did not understand run ${cmd.args}`
+  let exe = ei[0].trim()
+  exe = exe.substring(1,exe.length-1).trim()
+  let ignore_err
+  if(exe.endsWith("|| true")) {
+    ignore_err = true
+    exe = exe.substring(0, exe.length - "|| true".length).trim()
+  }
+  let loc = ei[1].trim()
+  if(isRemote(loc)) {
+    loc = sshinfo(dst).loc
+    shell.echo(`running ${p(exe,cmd)} in ${p(loc,cmd)}`)
+    exe = `cd ${loc} && ${exe}`
+    sshe(exe, cmd.conn, err => {
+      if(err && !ignore_err) throw err
+      cb()
+    })
+  } else {
+    shell.echo(`running ${p(exe,cmd)} in ${p(loc,cmd)}`)
+    exe = `cd ${loc} && ${exe}`
+    try {
+      shell.exec(exe)
+    } catch(e) {
+      if(ignore_err) shell.echo(e)
+      else throw e
+    }
+    cb()
+  }
+}
+
 
 function copydir(cmd, cb) {
   let sd = cmd.args.split(' ')
