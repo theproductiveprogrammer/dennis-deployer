@@ -121,7 +121,7 @@ function run(cmd, cb) {
 
 function copydir(cmd, cb) {
   let sd = cmd.args.split(' ')
-  if(sd.length != 2) throw `cannot get src/dest from ${cmd}`
+  if(sd.length != 2) throw `cannot get src/dest from ${cmd.word} ${cmd.args}`
   let src = path.resolve(sd[0])
   let dst = path.resolve(sd[1])
   if(isRemote(dst)) copydir_ssh_1(src, dst, cb)
@@ -172,7 +172,7 @@ function copydir(cmd, cb) {
 
 function copy(cmd, cb) {
   let sd = cmd.args.split(' ')
-  if(sd.length != 2) throw `cannot get src/dest from ${cmd}`
+  if(sd.length != 2) throw `cannot get src/dest from ${cmd.word} ${cmd.args}`
   let src = path.resolve(sd[0])
   let dst = path.resolve(sd[1])
   if(isRemote(dst)) copy_ssh_1(src, dst, cb)
