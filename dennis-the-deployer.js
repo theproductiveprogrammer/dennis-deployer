@@ -71,14 +71,10 @@ function doCmdNdx(cmds, ndx, cb) {
   let m = {
     tellme,
     copy,
-    copy_ssh,
     copydir,
-    copydir_ssh,
   }
 
   let word = cmd.word
-  if(isRemote(cmd.dst)) word += "_ssh"
-
   let handler = m[word] || m[cmd.word]
   if(!handler) throw `Did not understand ${cmd.word}`
   handler(cmd, err => {
@@ -94,52 +90,50 @@ function copydir(cmd, cb) {
   if(sd.length != 2) throw `cannot get src/dest from ${cmd}`
   let src = path.resolve(sd[0])
   let dst = path.resolve(sd[1])
-  let dstdir = path.dirname(dst)
-  let srcdir = path.dirname(src)
-  let name = path.basename(src)
+  if(isRemote(dst)) copydir_ssh_1(src, dst, cb)
+  else copydir_1(src, dst, cb)
 
-  shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
-  let tar = path.join(shell.tempdir(),path.basename(src))+'.tar'
-  if(shell.test('-f', tar)) shell.rm(tar)
-  shell.exec(`cd ${srcdir} && tar -cvf ${tar} ${name}`)
-  shell.exec(`cd ${dstdir} && tar -xvf ${tar}`)
-}
+  function copydir_1(src, dst, cb) {
+    let dstdir = path.dirname(dst)
+    let srcdir = path.dirname(src)
+    let name = path.basename(src)
 
-function copydir_ssh(cmd, cb) {
-  let sd = cmd.args.split(' ')
-  if(sd.length != 2) throw `cannot get src/dest from ${cmd}`
-  let src = path.resolve(sd[0])
-  let sshi = sshinfo(sd[1])
-  let dst = sshi.loc
-  let dstdir = path.dirname(dst)
-  let srcdir = path.dirname(src)
-  let name = path.basename(src)
+    shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
+    let tar = path.join(shell.tempdir(),path.basename(src))+'.tar'
+    if(shell.test('-f', tar)) shell.rm(tar)
+    shell.exec(`mkdir -p ${dstdir}`)
+    shell.exec(`cd ${srcdir} && tar -cf ${tar} ${name}`)
+    shell.exec(`cd ${dstdir} && tar -xf ${tar}`)
+    cb()
+  }
 
-  shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
-  let tar = path.join(shell.tempdir(),path.basename(src))+'.tar'
-  if(shell.test('-f', tar)) shell.rm(tar)
-  if(shell.test('-f', `${tar}.gz`)) shell.rm(`${tar}.gz`)
-  shell.exec(`
+  function copydir_ssh_1(src, dst, cb) {
+    dst = sshinfo(dst).loc
+    let dstdir = path.dirname(dst)
+    let srcdir = path.dirname(src)
+    let name = path.basename(src)
+
+    shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
+    let tar = path.join(shell.tempdir(),path.basename(src))+'.tar'
+    if(shell.test('-f', tar)) shell.rm(tar)
+    if(shell.test('-f', `${tar}.gz`)) shell.rm(`${tar}.gz`)
+    shell.exec(`
     cd ${srcdir} &&
-    tar -cvf ${tar} ${name} &&
+    tar -cf ${tar} ${name} &&
     gzip -9 ${tar}
   `)
-  let tgz = path.join(dstdir, `${name}.tar.gz`)
-  sshe(`mkdir -p ${dstdir}`, cmd.conn, err => {
-    if(err) cb(err)
-    else cmd.conn.sftp.fastPut(`${tar}.gz`, tgz, err => {
-      console.log(`
+    let tgz = path.join(dstdir, `${name}.tar.gz`)
+    sshe(`mkdir -p ${dstdir}`, cmd.conn, err => {
+      if(err) cb(err)
+      else cmd.conn.sftp.fastPut(`${tar}.gz`, tgz, err => {
+        sshe(`
         cd ${dstdir} &&
-        tar -xvf ${name}.tar.gz &&
-        rm ${name}.tar.gz
-        `)
-      sshe(`
-        cd ${dstdir} &&
-        tar -xvf ${name}.tar.gz &&
+        tar -xf ${name}.tar.gz &&
         rm ${name}.tar.gz
         `, cmd.conn, cb)
+      })
     })
-  })
+  }
 }
 
 function copy(cmd, cb) {
@@ -147,25 +141,26 @@ function copy(cmd, cb) {
   if(sd.length != 2) throw `cannot get src/dest from ${cmd}`
   let src = path.resolve(sd[0])
   let dst = path.resolve(sd[1])
-  let dstdir = path.dirname(dst)
-  shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
-  shell.mkdir('-p', dstdir)
-  shell.cp(src, dst)
-  cb()
-}
+  if(isRemote(dst)) copy_ssh_1(src, dst, cb)
+  else copy_1(src, dst, cb)
 
-function copy_ssh(cmd, cb) {
-  let sd = cmd.args.split(' ')
-  if(sd.length != 2) throw `cannot get src/dest from ${cmd}`
-  let src = path.resolve(sd[0])
-  let sshi = sshinfo(sd[1])
-  let dst = sshi.loc
-  let dstdir = path.dirname(dst)
-  shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
-  sshe(`mkdir -p ${dstdir}`, cmd.conn, err => {
-    if(err) cb(err)
-    else cmd.conn.sftp.fastPut(src, dst, cb)
-  })
+  function copy_1(src, dst, cb) {
+    let dstdir = path.dirname(dst)
+    shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
+    shell.mkdir('-p', dstdir)
+    shell.cp(src, dst)
+    cb()
+  }
+
+  function copy_ssh_1(src, dst, cb) {
+    dst = sshinfo(dst).loc
+    let dstdir = path.dirname(dst)
+    shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
+    sshe(`mkdir -p ${dstdir}`, cmd.conn, err => {
+      if(err) cb(err)
+      else cmd.conn.sftp.fastPut(src, dst, cb)
+    })
+  }
 }
 
 function p(loc, cmd) {
