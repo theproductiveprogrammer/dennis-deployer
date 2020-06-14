@@ -60,4 +60,10 @@ tellme All Done!
 
 ```
 
+## Motivation
+
+Having to deploy new repositories on different servers is a pain - create a new bare repo, add a hook, tar & gzip, then scp it across, ssh to untar etc.
+
+Dennis does all this neatly with a script that can work locally or on any server transparenly. It’s simple, nice, and usable.
+
 ---
