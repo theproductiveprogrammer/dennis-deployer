@@ -71,7 +71,6 @@ function doCmdNdx(cmds, ndx, cb) {
   let m = {
     tellme,
     copy,
-    copydir,
     run,
   }
 
@@ -175,6 +174,7 @@ function copy(cmd, cb) {
   if(sd.length != 2) throw `cannot get src/dest from ${cmd.word} ${cmd.args}`
   let src = path.resolve(sd[0])
   let dst = path.resolve(sd[1])
+  if(shell.test('-d', src)) return copydir(cmd, cb)
   if(isRemote(dst)) copy_ssh_1(src, dst, cb)
   else copy_1(src, dst, cb)
 
