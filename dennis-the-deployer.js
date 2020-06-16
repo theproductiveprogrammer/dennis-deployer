@@ -25,7 +25,7 @@ function usage() {
  * Load the base variables and perform the instructions
  */
 function deploy(f, dst, cb) {
-  if(!name) return cb(usage())
+  if(!f) return cb(usage())
   if(!dst) return cb(usage())
 
   loadInitialVars(f, dst, (err, vars) => {
@@ -45,7 +45,7 @@ function deploy(f, dst, cb) {
 
 function loadInitialVars(f, dst, cb) {
   let here = path.dirname(f)
-  let name = path.basename(f)
+  let name = path.basename(f, '.dpi')
   cb(null, {
     dst,
     here,
@@ -133,7 +133,7 @@ function tr(s) { return s.substring(1,s.length-1).trim() }
 function resolveVariables(ctx, args, cb) {
   let dst = resolve_dst_1(ctx)
 
-  let rx = /\{[-A-Za-z0-9_]*?\}/g
+  let rx = /\{[-.A-Za-z0-9_]*?\}/g
   let m = args.match(rx)
   if(m) {
     for(let i = 0;i < m.length;i++) {
@@ -200,8 +200,6 @@ function setupRemote(dst, ctx, cb) {
     ssh.on('error', cb)
     ssh.connect(sshi)
   })
-  ssh.on('error', cb)
-  ssh.connect(sshi)
 }
 
 function sshinfo(str) {
