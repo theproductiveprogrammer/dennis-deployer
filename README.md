@@ -97,6 +97,7 @@ You can set any deployment variables in the file and reference them using the `{
 | ------------- | :----------------------------------------------------------- |
 | dst           | name of destination<br />e.g: npm start test.dpi local<br />{dst} == local |
 | here          | location of these instructions                               |
+| name          | instructions name (without extension)<br />e.g: `npm start test.dpi local`<br />`{name}` == test<br />`{here}/{name}.dpi` gives the full path to the instructions |
 | pwd           | present working directory                                    |
 | tmp           | temporary directory location                                 |
 
