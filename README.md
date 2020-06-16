@@ -83,10 +83,10 @@ copy "{tmp}/{repo}.git" to "{dst}/REPOS/{repo}.git"
 
 # link up local and remote repo
 run "git remote rm {dst} || true" in "{town}/myrepo"
-run "git remote add {dst} {dst}/REPOS/{repo}.git" in "{town}/myrepo"
+run "git remote add {dst} {dst}/REPOS/{repo}.git" in "{town}/{repo}"
 
 # do an initial push
-run "git push -q {dst}" in "{town}/myrepo"
+run "git push -q {dst}" in "{town}/{repo}"
 
 tellme "Deployed repo {repo}"
 ```
