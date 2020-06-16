@@ -5,19 +5,172 @@ const path = require('path')
 const shell = require('shelljs')
 const ssh2 = require('ssh2')
 
+/*    understand/
+ * Main entry point into the program
+ */
 function main() {
-  shell.config.fatal = true
   shell.config.silent = true
 
-  deploy(process.argv[2], err => {
+  deploy(process.argv[2], process.argv[3], err => {
     if(err) console.error(err)
   })
 }
 
-function deploy(instructions, cb) {
-  if(!instructions) return cb("I need instructions (see README)")
-  let name = path.basename(instructions, '.dpi')
+function usage() {
+  return `npm start <deployment instructions> <dest>
+  see README.md for details`
+}
 
+/*    way/
+ * Load the base variables and perform the instructions
+ */
+function deploy(f, dst, cb) {
+  if(!name) return cb(usage())
+  if(!dst) return cb(usage())
+
+  loadInitialVars(f, dst, (err, vars) => {
+    if(err) return cb(err)
+
+    let ctx = { vars }
+    doCmds(f, ctx, err => {
+      if(ctx.conn) ctx.conn.ssh.end()
+      cb(err)
+    })
+  })
+}
+
+function loadInitialVars(f, dst, cb) {
+  let here = path.dirname(f)
+  let name = path.basename(f)
+  cb(null, {
+    dst,
+    here,
+    name,
+    pwd: process.env.PWD,
+    tmp: shell.tempdir(),
+  })
+}
+
+function doCmds(f, ctx, cb) {
+  let info = shell.cat(f).toString()
+  if(!info) return cb(`Failed to read ${f}`)
+  let lines = info.split(/[\r\n]/g)
+              .map(l => l.trim())
+              .filter(l => l)
+              .filter(l => l[0] != '#')
+  doCmdNdx(lines, 0, ctx, cb)
+}
+
+function doCmdNdx(lines, ndx, ctx, cb) {
+  if(ndx >= lines.length) return cb()
+  let l = lines[ndx].split(' ')
+  let cmd = { word: l[0], args: l.slice(1).join(' ') }
+
+  resolveVariables(ctx, cmd.args, (err, inst) => {
+    if(err) return cb(err)
+    cmd.inst = inst
+
+    handle_cmd_1(ctx, cmd, err => {
+      if(err) cb(err)
+      else doCmdNdx(lines, ndx+1, ctx, cb)
+    })
+  })
+
+  function handle_cmd_1(ctx, cmd, cb) {
+    let m = {
+      "let": bind_var_1,
+      "do": do_cmds_1,
+      tellme,
+      copy : dummy,
+      run : dummy,
+    }
+
+    let word = cmd.word
+    let handler = m[word] || m[cmd.word]
+    if(!handler) return cb(`Did not understand ${cmd.word}`)
+    handler(cmd, ctx, cb)
+  }
+
+  function dummy(cmd, ctx, cb) {
+    console.log(cmd.word, cmd.inst)
+    cb()
+  }
+
+  function bind_var_1(cmd, ctx, cb) {
+    let nv = cmd.inst.split("=")
+    if(nv.length != 2) return cb(`Could not set ${cmd.args}`)
+    ctx.vars[nv[0].trim()] = nv[1].trim()
+    cb()
+  }
+
+  function do_cmds_1(cmd, ctx, cb) {
+    let inst = cmd.inst
+    if(inst[0] == '"') inst = tr(inst)
+    let here = ctx.vars.here
+    ctx.vars.here = path.dirname(inst)
+    doCmds(inst, ctx, err => {
+      if(err) cb(err)
+      else {
+        ctx.vars.here = here
+        cb()
+      }
+    })
+  }
+}
+
+/*  trim quote */
+function tq(s) {
+  if(!s) return s
+  s = trim(s)
+  if(s[0] == '"') return tr(s)
+  else return s
+}
+/*  trim 1-char off ends */
+function tr(s) { return s.substring(1,s.length-1).trim() }
+
+function resolveVariables(ctx, args, cb) {
+  let dst = resolve_dst_1(ctx)
+
+  let rx = /\{[-A-Za-z0-9_]*?\}/g
+  let m = args.match(rx)
+  if(m) {
+    for(let i = 0;i < m.length;i++) {
+      let curr = m[i]
+      let v = tr(curr)
+      if(v == "dst") args = args.replace("{dst}", dst)
+      else {
+        let val = ctx.vars[v]
+        if(!val) return cb(`Could not resolve variable: {${v}}`)
+        args = args.replace(curr, val)
+      }
+    }
+  }
+  return cb(null, args)
+
+
+  /*    problem/
+   * the destination variable can point to another variable
+   * for example:
+   *    npm start instructions.dpi myserver
+   * (here myserver is another variable)
+   *    let myserver = user@server:/home/dest -p 22
+   *
+   * And the user would want the destination to resolve to
+   *    {dst} = user@server:/home/dest
+   *
+   *    way/
+   * We look for context variables that match the destination
+   * and resolve them if found.
+   */
+  function resolve_dst_1(ctx) {
+    let dst = ctx.vars.dst
+    dst = ctx.vars[dst] ? ctx.vars[dst] : dst
+    dst = dst ? dst.split(" -p ")[0] : dst
+    return dst
+  }
+}
+
+/*
   let f = path.join(process.env.PWD, instructions)
   let info = shell.cat(f).toString()
   info = parse(name, info, f)
@@ -33,7 +186,7 @@ function deploy(instructions, cb) {
   } else {
     doCmdNdx(info.cmds, 0, cb)
   }
-}
+}*/
 
 function setupSSH(dst, cb) {
   let sshi = sshinfo(dst)
