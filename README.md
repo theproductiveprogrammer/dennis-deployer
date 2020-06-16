@@ -24,41 +24,81 @@ Deploy locally or to a server! Dennis can do it all!
 
 “Ok boss but I can’t be held responsible if it blows up!”
 
-Dennis reads his instructions from a file. Every set of instructions starts with setting the `{SRC}` and `{DST}` locations. Dennis also understands how to use a `{TMP}` location (where it is actually is up to him).
+“Do all this again Dennis”
+
+“Cheerfully Boss!”
+
+Dennis reads his instructions from a file.
+
+```sh
+$> npm start <deployment instructions> <dest>
+# Eg: npm start deploy_everything {myserver}
+```
+
+There are a couple instructions that Dennis understands:
+
+```sh
+copy "path/to/src" to "path/to/dest"
+run "some command" in "some location"
+let var = value
+do "path/to/other/instructions"
+# Comment
+```
 
 Here’s a sample set of deployment instructions he’d understand:
 
 ```sh
-# Test deployment file
-src: {pwd}/..
-#dst: {pwd}/../DST-TST
-dst: user@server:/home/user/dst-tst -p 22
+# Test deployment file (test.dpi)
+let src = {pwd}
+let local = {pwd}/../DST-TST
+let myserver = user@server:/home/user/dst-tst -p 22
 
-# create a new bare repository
-# using the standard pattern "|| true" tells dennis to ignore errors in the run
-run "rm -rf {tmp}/myrepo.git || true" in {tmp}
-run "git clone --bare {src}/myrepo" in {tmp}
+let repo = myrepo
+do "{here}/upload_repo.dpi"
 
-# step back so that we can do an initial push
-run "git update-ref HEAD HEAD^" in {tmp}/myrepo.git
-
-# copy the post-receive hook
-copy {pwd}/post-receive {tmp}/myrepo.git/hooks/post-receive
-run "chmod +x post-receive" in {tmp}/myrepo.git/hooks
-
-# DEPLOY! (works both locally and on any server)
-copydir {tmp}/myrepo.git {dst}/_REPOS/myrepo.git
-
-# link up local and remote repo
-run "git remote rm {deploy} || true" in {src}/myrepo
-run "git remote add {deploy} {dst}/_REPOS/myrepo.git" in {src}/myrepo
-
-# do an initial push
-run "git push -q {deploy}" in {src}/myrepo
+let repo = another_repo
+do "{here}/upload_repo.dpi"
 
 tellme All Done!
 
 ```
+
+```sh
+# upload_repo.dpi
+
+# create a new bare repository
+# note that using the pattern "|| true"  causes dennis to ignore errors in the run just like in bash
+run "rm -rf {tmp}/{repo}.git || true" in "{tmp}"
+run "git clone --bare {src}/{repo}" in "{tmp}"
+
+# step back so that we can do an initial push
+run "git update-ref HEAD HEAD^" in "{tmp}/{repo}.git"
+
+# copy the post-receive hook
+copy "{here}/post-receive" to "{tmp}/{repo}.git/hooks/post-receive"
+run "chmod +x post-receive" in "{tmp}/{repo}.git/hooks"
+
+# DEPLOY! (either locally or to the server)
+copy "{tmp}/{repo}.git" to "{dst}/REPOS/{repo}.git"
+
+# link up local and remote repo
+run "git remote rm {dst} || true" in "{town}/myrepo"
+run "git remote add {dst} {dst}/REPOS/{repo}.git" in "{town}/myrepo"
+
+# do an initial push
+run "git push -q {dst}" in "{town}/myrepo"
+```
+
+## Deployment Variables
+
+You can set any deployment variables in the file and reference them using the `{var}` syntax. The following variables are avaiable by default because they are useful for any deployment:
+
+| variable name | description                                                  |
+| ------------- | :----------------------------------------------------------- |
+| dst           | name of destination<br />e.g: npm start test.dpi local<br />{dst} == local |
+| here          | location of these instructions                               |
+| pwd           | present working directory                                    |
+| tmp           | temporary directory location                                 |
 
 ## Motivation
 
