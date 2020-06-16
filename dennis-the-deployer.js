@@ -7,9 +7,15 @@ const ssh2 = require('ssh2')
 
 function main() {
   shell.config.fatal = true
+  shell.config.silent = true
 
-  let instructions = process.argv[2]
-  if(!instructions) throw "I need instructions (see README)"
+  deploy(process.argv[2], err => {
+    if(err) console.error(err)
+  })
+}
+
+function deploy(instructions, cb) {
+  if(!instructions) return cb("I need instructions (see README)")
   let name = path.basename(instructions, '.dpi')
 
   let f = path.join(process.env.PWD, instructions)
@@ -17,17 +23,15 @@ function main() {
   info = parse(name, info, f)
   if(isRemote(info.dst)) {
     setupSSH(info.dst, (err, conn) => {
-      if(err) throw err
+      if(err) return cb(err)
       info.cmds.map(cmd => cmd.conn = conn)
       doCmdNdx(info.cmds, 0, err => {
         conn.ssh.end()
-        if(err) throw err
+        if(err) return cb(err)
       })
     })
   } else {
-    doCmdNdx(info.cmds, 0, err => {
-      if(err) throw err
-    })
+    doCmdNdx(info.cmds, 0, cb)
   }
 }
 
@@ -76,7 +80,7 @@ function doCmdNdx(cmds, ndx, cb) {
 
   let word = cmd.word
   let handler = m[word] || m[cmd.word]
-  if(!handler) throw `Did not understand ${cmd.word}`
+  if(!handler) return cb(`Did not understand ${cmd.word}`)
   handler(cmd, err => {
     if(err) return cb(err)
     doCmdNdx(cmds, ndx+1, cb)
@@ -87,7 +91,7 @@ function tellme(cmd, cb) { shell.echo(cmd.args); cb() }
 
 function run(cmd, cb) {
   let ei = cmd.args.split(" in ")
-  if(ei.length != 2) throw `Did not understand run ${cmd.args}`
+  if(ei.length != 2) return cb(`Did not understand run ${cmd.args}`)
   let exe = ei[0].trim()
   exe = exe.substring(1,exe.length-1).trim()
   let ignore_err
@@ -101,7 +105,7 @@ function run(cmd, cb) {
     shell.echo(`running ${p(exe,cmd)} in ${p(loc,cmd)}`)
     exe = `cd ${loc} && ${exe}`
     sshe(exe, cmd.conn, err => {
-      if(err && !ignore_err) throw err
+      if(err && !ignore_err) return cb(err)
       cb()
     })
   } else {
@@ -111,7 +115,7 @@ function run(cmd, cb) {
       shell.exec(exe)
     } catch(e) {
       if(ignore_err) shell.echo(e)
-      else throw e
+      else return cb(e)
     }
     cb()
   }
@@ -120,7 +124,7 @@ function run(cmd, cb) {
 
 function copydir(cmd, cb) {
   let sd = cmd.args.split(' ')
-  if(sd.length != 2) throw `cannot get src/dest from ${cmd.word} ${cmd.args}`
+  if(sd.length != 2) return cb(`cannot get src/dest from ${cmd.word} ${cmd.args}`)
   let src = path.resolve(sd[0])
   let dst = path.resolve(sd[1])
   if(isRemote(dst)) copydir_ssh_1(src, dst, cb)
@@ -171,7 +175,7 @@ function copydir(cmd, cb) {
 
 function copy(cmd, cb) {
   let sd = cmd.args.split(' ')
-  if(sd.length != 2) throw `cannot get src/dest from ${cmd.word} ${cmd.args}`
+  if(sd.length != 2) return cb(`cannot get src/dest from ${cmd.word} ${cmd.args}`)
   let src = path.resolve(sd[0])
   let dst = path.resolve(sd[1])
   if(shell.test('-d', src)) return copydir(cmd, cb)
