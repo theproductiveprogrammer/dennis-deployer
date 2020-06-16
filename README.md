@@ -59,7 +59,7 @@ do "{here}/upload_repo.dpi"
 let repo = another_repo
 do "{here}/upload_repo.dpi"
 
-tellme All Done!
+tellme "All Done!"
 
 ```
 
@@ -87,6 +87,8 @@ run "git remote add {dst} {dst}/REPOS/{repo}.git" in "{town}/myrepo"
 
 # do an initial push
 run "git push -q {dst}" in "{town}/myrepo"
+
+tellme "Deployed repo {repo}"
 ```
 
 ## Deployment Variables
