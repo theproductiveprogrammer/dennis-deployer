@@ -106,12 +106,14 @@ function doCmdNdx(lines, ndx, ctx, cb) {
   function do_cmds_1(cmd, ctx, cb) {
     let inst = cmd.inst
     if(inst[0] == '"') inst = tr(inst)
-    let here = ctx.vars.here
+    let vars = ctx.vars
+    ctx.vars = {}
+    for(let k in vars) ctx.vars[k] = vars[k]
     ctx.vars.here = path.dirname(inst)
     doCmds(inst, ctx, err => {
       if(err) cb(err)
       else {
-        ctx.vars.here = here
+        ctx.vars = vars
         cb()
       }
     })
