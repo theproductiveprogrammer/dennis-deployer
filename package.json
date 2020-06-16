@@ -3,6 +3,9 @@
   "version": "2.1.0",
   "description": "Dennis The Deployer",
   "main": "dennis-the-deployer.js",
+  "scripts": {
+    "start": "node ."
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/theproductiveprogrammer/dennis-deployer.git"
