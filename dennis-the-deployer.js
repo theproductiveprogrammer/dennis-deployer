@@ -31,9 +31,13 @@ function deploy(f, dst, cb) {
   loadInitialVars(f, dst, (err, vars) => {
     if(err) return cb(err)
 
+    for(let k in vars) shell.echo(`setting ${k} = ${vars[k]}`)
+
     let ctx = { vars }
     doCmds(f, ctx, err => {
-      if(ctx.conn) ctx.conn.ssh.end()
+      if(ctx.conns) {
+        for(let k in ctx.conns) ctx.conns[k].ssh.end()
+      }
       cb(err)
     })
   })
@@ -81,8 +85,8 @@ function doCmdNdx(lines, ndx, ctx, cb) {
       "let": bind_var_1,
       "do": do_cmds_1,
       tellme,
-      copy : dummy,
-      run : dummy,
+      copy,
+      run,
     }
 
     let word = cmd.word
@@ -97,6 +101,7 @@ function doCmdNdx(lines, ndx, ctx, cb) {
   }
 
   function bind_var_1(cmd, ctx, cb) {
+    shell.echo(`setting ${cmd.args}`)
     let nv = cmd.inst.split("=")
     if(nv.length != 2) return cb(`Could not set ${cmd.args}`)
     ctx.vars[nv[0].trim()] = nv[1].trim()
@@ -189,7 +194,10 @@ function resolveVariables(ctx, args, cb) {
   }
 }*/
 
-function setupSSH(dst, cb) {
+function setupRemote(dst, ctx, cb) {
+  if(!ctx.conns) ctx.conns = {}
+  if(ctx.conns[dst]) return cb(null, ctx.conns[dst])
+
   let sshi = sshinfo(dst)
   shell.echo(`Connecting to: ${JSON.stringify(sshi)}`)
 
@@ -204,7 +212,8 @@ function setupSSH(dst, cb) {
         ssh.close()
         return cb(err)
       }
-      cb(null, { ssh, sftp })
+      ctx.conns[dst] = { ssh, sftp }
+      cb(null, ctx.conns[dst])
     })
   })
   ssh.on('error', cb)
@@ -241,70 +250,88 @@ function doCmdNdx(cmds, ndx, cb) {
   })
 }
 
-function tellme(cmd, cb) { shell.echo(cmd.args); cb() }
+function tellme(cmd, ctx, cb) {
+  let say = tq(cmd.inst)
+  shell.echo(`===> ${say}` )
+  cb()
+}
 
-function run(cmd, cb) {
-  let ei = cmd.args.split(" in ")
+function run(cmd, ctx, cb) {
+  let ei = cmd.inst.split(" in ")
   if(ei.length != 2) return cb(`Did not understand run ${cmd.args}`)
-  let exe = ei[0].trim()
-  exe = exe.substring(1,exe.length-1).trim()
+  let exe = tq(ei[0].trim())
   let ignore_err
   if(exe.endsWith("|| true")) {
     ignore_err = true
     exe = exe.substring(0, exe.length - "|| true".length).trim()
   }
-  let loc = ei[1].trim()
+  let loc = tq(ei[1].trim())
   if(isRemote(loc)) {
-    loc = sshinfo(dst).loc
-    shell.echo(`running ${p(exe,cmd)} in ${p(loc,cmd)}`)
-    exe = `cd ${loc} && ${exe}`
-    sshe(exe, cmd.conn, err => {
-      if(err && !ignore_err) return cb(err)
-      cb()
+    setupRemote(dst, ctx, (err, conn) => {
+      if(err) return cb(err)
+      loc = sshinfo(dst).loc
+      shell.echo(`running ${cmd.args}`)
+      exe = `cd ${loc} && ${exe}`
+      sshe(exe, conn, err => {
+        if(err && !ignore_err) cb(err)
+        else cb()
+      })
     })
   } else {
-    shell.echo(`running ${p(exe,cmd)} in ${p(loc,cmd)}`)
+    shell.echo(`running ${cmd.args}`)
     exe = `cd ${loc} && ${exe}`
-    try {
-      shell.exec(exe)
-    } catch(e) {
-      if(ignore_err) shell.echo(e)
-      else return cb(e)
-    }
-    cb()
+    exe = shell.exec(exe)
+    if(exe.code && !ignore_err) cb(exe.stderr)
+    else cb()
   }
 }
 
 
-function copydir(cmd, cb) {
-  let sd = cmd.args.split(' ')
+function copydir(cmd, ctx, cb) {
+  let sd = cmd.inst.split(" to ")
   if(sd.length != 2) return cb(`cannot get src/dest from ${cmd.word} ${cmd.args}`)
-  let src = path.resolve(sd[0])
-  let dst = path.resolve(sd[1])
-  if(isRemote(dst)) copydir_ssh_1(src, dst, cb)
-  else copydir_1(src, dst, cb)
-
-  function copydir_1(src, dst, cb) {
-    let dstdir = path.dirname(dst)
-    let srcdir = path.dirname(src)
-    let name = path.basename(src)
-
-    shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
-    let tar = path.join(shell.tempdir(),path.basename(src))+'.tar'
-    if(shell.test('-f', tar)) shell.rm(tar)
-    shell.exec(`mkdir -p ${dstdir}`)
-    shell.exec(`cd ${srcdir} && tar -cf ${tar} ${name}`)
-    shell.exec(`cd ${dstdir} && tar -xf ${tar}`)
-    cb()
+  let src = path.resolve(tq(sd[0]))
+  let dst = tq(sd[1])
+  shell.echo(`copying ${cmd.args}`)
+  if(isRemote(dst)) {
+    setupRemote(dst, ctx, (err, conn) => {
+      if(err) return cb(err)
+      copydir_ssh_1(src, dst, conn, cb)
+    })
+  } else {
+    dst = path.resolve(dst)
+    copydir_1(src, dst, cb)
   }
 
-  function copydir_ssh_1(src, dst, cb) {
+  function copydir_1(src, dst, cb) {
+    shell.config.fatal = true
+    let err
+    try {
+
+      let dstdir = path.dirname(dst)
+      let srcdir = path.dirname(src)
+      let name = path.basename(src)
+
+      let tar = path.join(ctx.vars.tmp,path.basename(src))+'.tar'
+      if(shell.test('-f', tar)) shell.rm(tar)
+      shell.exec(`mkdir -p ${dstdir}`)
+      shell.exec(`cd ${srcdir} && tar -cf ${tar} ${name}`)
+      shell.exec(`cd ${dstdir} && tar -xf ${tar}`)
+
+    } catch(e) {
+      err = e.message
+    }
+
+    shell.config.fatal = false
+    cb(err)
+  }
+
+  function copydir_ssh_1(src, dst, conn, cb) {
     dst = sshinfo(dst).loc
     let dstdir = path.dirname(dst)
     let srcdir = path.dirname(src)
     let name = path.basename(src)
 
-    shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
     let tar = path.join(shell.tempdir(),path.basename(src))+'.tar'
     if(shell.test('-f', tar)) shell.rm(tar)
     if(shell.test('-f', `${tar}.gz`)) shell.rm(`${tar}.gz`)
@@ -314,43 +341,57 @@ function copydir(cmd, cb) {
     gzip -9 ${tar}
   `)
     let tgz = path.join(dstdir, `${name}.tar.gz`)
-    sshe(`mkdir -p ${dstdir}`, cmd.conn, err => {
+    sshe(`mkdir -p ${dstdir}`, conn, err => {
       if(err) cb(err)
-      else cmd.conn.sftp.fastPut(`${tar}.gz`, tgz, err => {
+      else conn.sftp.fastPut(`${tar}.gz`, tgz, err => {
         sshe(`
         cd ${dstdir} &&
         tar -xf ${name}.tar.gz &&
         rm ${name}.tar.gz
-        `, cmd.conn, cb)
+        `, conn, cb)
       })
     })
   }
 }
 
-function copy(cmd, cb) {
-  let sd = cmd.args.split(' ')
+function copy(cmd, ctx, cb) {
+  let sd = cmd.inst.split(" to ")
   if(sd.length != 2) return cb(`cannot get src/dest from ${cmd.word} ${cmd.args}`)
-  let src = path.resolve(sd[0])
-  let dst = path.resolve(sd[1])
-  if(shell.test('-d', src)) return copydir(cmd, cb)
-  if(isRemote(dst)) copy_ssh_1(src, dst, cb)
-  else copy_1(src, dst, cb)
+  let src = path.resolve(tq(sd[0]))
+  let dst = path.resolve(tq(sd[1]))
+  if(shell.test('-d', src)) return copydir(cmd, ctx, cb)
+  shell.echo(`copying ${cmd.args}`)
+  if(isRemote(dst)) {
+    setupRemote(dst, ctx, (err, conn) => {
+      if(err) return cb(err)
+      copy_ssh_1(src, dst, conn, cb)
+    })
+  } else {
+    copy_1(src, dst, cb)
+  }
 
   function copy_1(src, dst, cb) {
-    let dstdir = path.dirname(dst)
-    shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
-    shell.mkdir('-p', dstdir)
-    shell.cp(src, dst)
+    shell.config.fatal = true
+    let err
+
+    try {
+      let dstdir = path.dirname(dst)
+      shell.mkdir('-p', dstdir)
+      shell.cp(src, dst)
+    } catch(e) {
+      err = e.message
+    }
+
+    shell.config.fatal = false
     cb()
   }
 
-  function copy_ssh_1(src, dst, cb) {
+  function copy_ssh_1(src, dst, conn, cb) {
     dst = sshinfo(dst).loc
     let dstdir = path.dirname(dst)
-    shell.echo(`copying ${p(src,cmd)} to ${p(dst,cmd)}`)
-    sshe(`mkdir -p ${dstdir}`, cmd.conn, err => {
+    sshe(`mkdir -p ${dstdir}`, conn, err => {
       if(err) cb(err)
-      else cmd.conn.sftp.fastPut(src, dst, cb)
+      else conn.sftp.fastPut(src, dst, cb)
     })
   }
 }
