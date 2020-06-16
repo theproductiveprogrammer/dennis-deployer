@@ -82,11 +82,11 @@ run "chmod +x post-receive" in "{tmp}/{repo}.git/hooks"
 copy "{tmp}/{repo}.git" to "{dst}/REPOS/{repo}.git"
 
 # link up local and remote repo
-run "git remote rm {dst} || true" in "{town}/myrepo"
-run "git remote add {dst} {dst}/REPOS/{repo}.git" in "{town}/{repo}"
+run "git remote rm {name}.{dst.name} || true" in "{town}/myrepo"
+run "git remote add {name}.{dst.name} {dst}/REPOS/{repo}.git" in "{town}/{repo}"
 
 # do an initial push
-run "git push -q {dst}" in "{town}/{repo}"
+run "git push -q {name}.{dst.name}" in "{town}/{repo}"
 
 tellme "Deployed repo {repo}"
 ```
@@ -97,7 +97,7 @@ You can set any deployment variables in the file and reference them using the `{
 
 | variable name | description                                                  |
 | ------------- | :----------------------------------------------------------- |
-| dst           | name of destination<br />e.g: npm start test.dpi local<br />{dst} == local |
+| dst           | location of destination<br />e.g: `npm start test.dpi local`<br />`{dst.name}` == local<br />`{dst}` == expanded local variable path |
 | here          | location of these instructions                               |
 | name          | instructions name (without extension)<br />e.g: `npm start test.dpi local`<br />`{name}` == test<br />`{here}/{name}.dpi` gives the full path to the instructions |
 | pwd           | present working directory                                    |

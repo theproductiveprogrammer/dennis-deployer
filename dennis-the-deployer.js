@@ -138,6 +138,7 @@ function resolveVariables(ctx, args, cb) {
       let curr = m[i]
       let v = tr(curr)
       if(v == "dst") args = args.replace("{dst}", dst)
+      else if(v == "dst.name") args = args.replace("{dst.name}", ctx.vars.dst)
       else {
         let val = ctx.vars[v]
         if(!val) return cb(`Could not resolve variable: {${v}}`)
