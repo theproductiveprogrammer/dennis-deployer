@@ -126,7 +126,7 @@ function doCmdNdx(lines, ndx, ctx, cb) {
 /*  trim quote */
 function tq(s) {
   if(!s) return s
-  s = trim(s)
+  s = s.trim()
   if(s[0] == '"') return tr(s)
   else return s
 }
