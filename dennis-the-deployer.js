@@ -95,11 +95,6 @@ function doCmdNdx(lines, ndx, ctx, cb) {
     handler(cmd, ctx, cb)
   }
 
-  function dummy(cmd, ctx, cb) {
-    console.log(cmd.word, cmd.inst)
-    cb()
-  }
-
   function bind_var_1(cmd, ctx, cb) {
     shell.echo(`setting ${cmd.args}`)
     let nv = cmd.inst.split("=")
@@ -176,24 +171,6 @@ function resolveVariables(ctx, args, cb) {
   }
 }
 
-/*
-  let f = path.join(process.env.PWD, instructions)
-  let info = shell.cat(f).toString()
-  info = parse(name, info, f)
-  if(isRemote(info.dst)) {
-    setupSSH(info.dst, (err, conn) => {
-      if(err) return cb(err)
-      info.cmds.map(cmd => cmd.conn = conn)
-      doCmdNdx(info.cmds, 0, err => {
-        conn.ssh.end()
-        if(err) return cb(err)
-      })
-    })
-  } else {
-    doCmdNdx(info.cmds, 0, cb)
-  }
-}*/
-
 function setupRemote(dst, ctx, cb) {
   if(!ctx.conns) ctx.conns = {}
   if(ctx.conns[dst]) return cb(null, ctx.conns[dst])
@@ -229,25 +206,6 @@ function sshinfo(str) {
   let port = info2[1]
   if(!port) port = "22"
   return { username, host, loc, port }
-}
-
-function doCmdNdx(cmds, ndx, cb) {
-  if(ndx >= cmds.length) return cb()
-  let cmd = cmds[ndx]
-
-  let m = {
-    tellme,
-    copy,
-    run,
-  }
-
-  let word = cmd.word
-  let handler = m[word] || m[cmd.word]
-  if(!handler) return cb(`Did not understand ${cmd.word}`)
-  handler(cmd, err => {
-    if(err) return cb(err)
-    doCmdNdx(cmds, ndx+1, cb)
-  })
 }
 
 function tellme(cmd, ctx, cb) {
@@ -396,14 +354,6 @@ function copy(cmd, ctx, cb) {
   }
 }
 
-function p(loc, cmd) {
-  return '"' +
-    loc.replace(cmd.src,'{src}')
-    .replace(cmd.dst,'{dst}')
-    .replace(TMPDIR, '{tmp}')
-  + '"'
-}
-
 function sshe(cmd, conn, cb) {
   let go = conn.ssh.exec(cmd, (err, stream) => {
     if(err) cb(err)
@@ -425,62 +375,8 @@ function sshe(cmd, conn, cb) {
   }
 }
 
-
-
 function isRemote(p) {
   return p.indexOf('@') != -1 && p.indexOf(':') != -1
-}
-
-/*    understand/
- * We expect information to be in this format:
- * src: <src path>
- * # Comment
- * dst: <destination path>
- * <list of commands>
- */
-function parse(name, data, f) {
-  let lines = data.split(/[\r\n]/g)
-                .map(l => l.trim())
-                .filter(l => l)
-                .filter(l => l[0] != '#')
-  if(lines.length < 3) throw `No information in ${f}`
-  if(!lines[0].startsWith("src:")) throw "First line must be 'src:'"
-  if(!lines[1].startsWith("dst:")) throw "Second line must be 'dst:'"
-
-  let src = lines[0].substring("src:".length).trim()
-  src = path.resolve(resolveTokens(src, name))
-  let dst = lines[1].substring("dst:".length).trim()
-  dst = resolveTokens(dst, name, src)
-  if(!isRemote(dst)) dst = path.resolve(dst)
-  let cmds = lines.slice(2)
-              .map(l => resolveTokens(l, name, src, dst))
-              .map(to_cmd_1)
-
-  return { src, dst, cmds }
-
-  function to_cmd_1(l) {
-    l = l.split(' ')
-    return { src, dst, word: l[0], args: l.slice(1).join(' ') }
-  }
-}
-
-/*    way/
- * Resolve any tokens on the given line:
- *    {src} ==> source directory
- *    {dst} ==> destination directory
- *    {deploy} ==> name of deployment
- *    {tmp} ==> temporary directory
- *    {pwd} ==> location of present working directory
- */
-let TMPDIR = shell.tempdir()
-function resolveTokens(line, name, src, dst) {
-  dst = dst ? dst.split(" -p ")[0] : dst
-  line = line.replace(/\{src\}/g, src)
-  line = line.replace(/\{dst\}/g, dst)
-  line = line.replace(/\{deploy\}/g, name)
-  line = line.replace(/\{tmp\}/g, TMPDIR)
-  line = line.replace(/\{pwd\}/g, process.env.PWD)
-  return line
 }
 
 main()
