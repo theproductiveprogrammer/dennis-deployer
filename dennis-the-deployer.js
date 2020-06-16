@@ -179,19 +179,24 @@ function setupRemote(dst, ctx, cb) {
   shell.echo(`Connecting to: ${JSON.stringify(sshi)}`)
 
   let key = path.join(process.env.HOME, '.ssh', 'id_rsa')
-  sshi.privateKey = fs.readFileSync(key)
+  fs.readFile(key, (err, data) => {
+    if(err) return cb(err)
+    sshi.privateKey = data
 
-  let ssh = new ssh2.Client()
-  ssh.on('ready', err => {
-    if(err) cb(err)
-    else ssh.sftp(function(err, sftp) {
-      if(err) {
-        ssh.close()
-        return cb(err)
-      }
-      ctx.conns[dst] = { ssh, sftp }
-      cb(null, ctx.conns[dst])
+    let ssh = new ssh2.Client()
+    ssh.on('ready', err => {
+      if(err) cb(err)
+      else ssh.sftp(function(err, sftp) {
+        if(err) {
+          ssh.close()
+          return cb(err)
+        }
+        ctx.conns[dst] = { ssh, sftp }
+        cb(null, ctx.conns[dst])
+      })
     })
+    ssh.on('error', cb)
+    ssh.connect(sshi)
   })
   ssh.on('error', cb)
   ssh.connect(sshi)
@@ -264,6 +269,7 @@ function copydir(cmd, ctx, cb) {
   function copydir_1(src, dst, cb) {
     shell.config.fatal = true
     let err
+
     try {
 
       let dstdir = path.dirname(dst)
